@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MAX Messenger</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="glass-container">
+    <header class="glass-header">
+      <h1>
+        <img src="icon.png" alt="Logo" class="logo">
+        MAX Messenger
+      </h1>
+      <div class="header-actions">
+        <span id="whoami" class="user-badge"></span>
+        <button id="profileBtn" class="glass-btn" hidden>Profile</button>
+        <!-- <button id="walletBtn" class="glass-btn">💼 Wallet</button> -->  
+        <button id="toggleUsersBtn" class="glass-btn">👥</button>
+      </div>
+    </header>
+
+    <!-- Auth card -->
+    <section id="authCard" class="glass-card">
+      <div class="glass-tabs">
+        <button id="loginTab" class="glass-tab active">Login</button>
+        <button id="registerTab" class="glass-tab">Register</button>
+      </div>
+
+      <form id="authForm" class="glass-form">
+        <label class="glass-label">
+          Username
+          <input id="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required class="glass-input" />
+        </label>
+        <label class="glass-label">
+          Password
+          <div class="password-wrapper">
+            <input id="password" type="password" minlength="4" required class="glass-input" />
+            <button type="button" id="togglePassword" class="toggle-password">👁️</button>
+          </div>
+        </label>
+        <button id="authSubmit" type="submit" class="glass-btn primary">Login</button>
+        <p class="glass-hint">Usernames: letters, numbers, underscore. 3–20 chars.</p>
+        <p id="authError" class="glass-error" role="alert"></p>
+      </form>
+    </section>
+
+    <!-- Chat UI -->
+    <section id="chatUI" class="glass-chat" hidden>
+      <div id="messages" class="glass-messages" aria-live="polite"></div>
+
+      <button id="scrollBottomBtn" class="glass-scroll-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+        </svg>
+      </button>
+
+      <form id="sendForm" class="glass-sendbar">
+        <textarea id="messageInput" rows="2" maxlength="500" placeholder="Type a message…" class="glass-input"></textarea>
+        <div id="replyPreview" style="display:none;"></div>
+        <div class="attachment-options">
+          <input type="file" id="imageUpload" accept="image/*" hidden>
+          <button type="button" id="attachImageBtn" class="glass-btn">📷</button>
+          <button type="button" id="stickerBtn" class="glass-btn">🎨</button>
+        </div>
+        <button id="sendBtn" type="submit" class="glass-btn primary">
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- Wallet Modal -->
+    <section id="walletModal" class="glass-modal" hidden>
+      <h2>My Wallet</h2>
+      <div id="walletContent"></div>
+      <div class="modal-actions">
+        <button id="closeWallet" class="glass-btn">Close</button>
+      </div>
+    </section>
+
+
+    <!-- Profile Modal -->
+    <section id="profileModal" class="glass-modal" hidden>
+      <h2>My Profile</h2>
+      <p><strong>Username:</strong> <span id="profileUsername"></span></p>
+
+      <p><strong>Balance:</strong> <span id="profileBalance"></span> 💰</p>
+
+      <p><strong>Bio:</strong></p>
+      <textarea id="profileBio" rows="4" maxlength="200" placeholder="Write something about yourself..." class="glass-input"></textarea>
+
+      <p><strong>Theme Colors:</strong></p>
+      <div class="color-pickers">
+        <div class="color-item">
+          <label for="themeColor1">First Color</label>
+          <input type="color" id="themeColor1" value="#667eea">
+        </div>
+
+        <div class="color-item">
+          <label for="themeColor2">Second Color</label>
+          <input type="color" id="themeColor2" value="#764ba2">
+        </div>
+      <div class="reset-theme" id="resetTheme">Reset to Default</div>
+      </div>
+      <div class="modal-actions">
+        <button id="saveBio" class="glass-btn primary">Save</button>
+        <button id="logoutBtn" class="glass-btn danger">Logout</button>
+        <button id="closeProfile" class="glass-btn">Close</button>
+      </div>
+    </section>
+
+
+    <!-- View Profile Modal -->
+    <section id="viewProfileModal" class="glass-modal" hidden>
+      <h2>User Profile</h2>
+      <p><strong>Username:</strong> <span id="viewProfileUsername"></span></p>
+      <p><strong>Created:</strong> <span id="viewProfileCreated"></span></p>
+      <p><strong>Balance:</strong> <span id="viewProfileBalance"></span> 💰</p>
+      <p><strong>Bio:</strong></p>
+      <div class="glass-bio"><p id="viewProfileBio"></p></div>
+      <div class="modal-actions">
+        <button id="closeViewProfile" class="glass-btn">Close</button>
+      </div>
+    </section>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="glass-loading" hidden>
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p class="loading-text">Logging in...</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
