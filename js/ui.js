@@ -438,7 +438,58 @@ resetBtn.addEventListener("click", () => {
   localStorage.setItem("themeColor2", default2);
 });
 
+// Font customization functionality
+const fontFamilySelect = document.getElementById("fontFamily");
+const resetFontBtn = document.getElementById("resetFont");
 
+// Apply font to the document
+function applyFontFamily(font) {
+  document.documentElement.style.setProperty("--font-family", font);
+}
+
+// Save font preference to localStorage
+function saveFontPreference() {
+  localStorage.setItem("fontFamily", fontFamilySelect.value);
+}
+
+// Load font preference from localStorage
+function loadFontPreference() {
+  const savedFont = localStorage.getItem("fontFamily");
+  if (savedFont) {
+    fontFamilySelect.value = savedFont;
+    applyFontFamily(savedFont);
+  }
+}
+
+// Reset to default font
+function resetToDefaultFont() {
+  const defaultFont = "'Segoe UI', system-ui, -apple-system, sans-serif";
+  fontFamilySelect.value = defaultFont;
+  applyFontFamily(defaultFont);
+  saveFontPreference();
+}
+
+// Event listeners for font customization
+fontFamilySelect?.addEventListener("change", () => {
+  applyFontFamily(fontFamilySelect.value);
+  saveFontPreference();
+});
+
+resetFontBtn?.addEventListener("click", resetToDefaultFont);
+
+// Initialize font when DOM is loaded
+document.addEventListener("DOMContentLoaded", () => {
+  // Add the font variable to root if it doesn't exist
+  if (!getComputedStyle(document.documentElement).getPropertyValue('--font-family')) {
+    document.documentElement.style.setProperty(
+      "--font-family", 
+      "'Segoe UI', system-ui, -apple-system, sans-serif"
+    );
+  }
+  
+  // Load saved font preference
+  loadFontPreference();
+});
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', initUI);

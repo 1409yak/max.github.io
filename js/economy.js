@@ -28,7 +28,7 @@ export async function getBalance(username) {
 }
 
 // Increase balance of current user
-export async function addCoins(username, amount = 5) {
+export async function addCoins(username, amount = 10) {
   try {
     const auth = loadAuth();
     if (!auth) return false;

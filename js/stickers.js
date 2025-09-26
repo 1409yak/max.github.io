@@ -2,10 +2,11 @@
 import { postForm } from './api.js';
 import { loadAuth } from './auth.js';
 import { refreshUserBalance } from './profiles.js';
-import { sendMessage } from './chat.js'; // Import the sendMessage function
+import { sendMessage } from './chat.js'; 
+import { insertPrivateSticker } from './private-chat.js';
 
 // Sticker configuration
-const STICKER_COUNT = 100;
+const STICKER_COUNT = 102;
 const INDIVIDUAL_PRICE = 500;
 
 // DOM Elements
@@ -45,7 +46,7 @@ export async function initStickers() {
   return stickerLoadPromise;
 }
 
-// Generate sticker objects for bg1.png to bg30.png
+// Generate sticker objects for 001.png to 100.png
 function generateStickers() {
   const stickers = [];
   for (let i = 1; i <= STICKER_COUNT; i++) {
@@ -78,7 +79,7 @@ async function loadUserStickers() {
     });
     
     if (response.status === 'ok') {
-      // Convert sticker names to IDs (e.g., "bg1.png" -> 1)
+      // Convert sticker names to IDs (e.g., "001.png" -> 1)
       userStickers = (response.stickers || []).map(stickerName => {
         if (typeof stickerName !== 'string') return null;
         const match = stickerName.match(/^(\d{3})\.png$/); // e.g. "001.png"
@@ -128,9 +129,6 @@ function createStickerUI() {
         
         <!-- Right Side: Shop -->
         <div class="shop-section">
-          <!-- Sticker Pack Option -->
-        
-          
           <!-- Individual Stickers Option -->
           <div class="individual-stickers-section">
             <h4>Stickers</h4>
@@ -150,7 +148,6 @@ function createStickerUI() {
   
   // Event listeners
   stickerModal.querySelector('.close-sticker-modal').addEventListener('click', closeStickerModal);
-  stickerModal.querySelector('#buyStickerPack').addEventListener('click', buyStickerPack);
   
   // Close modal when clicking outside
   stickerModal.addEventListener('click', (e) => {
@@ -200,11 +197,6 @@ function renderUserSticker(sticker) {
       </button>
     </div>
   `;
-  
-  stickerElement.querySelector('.send-sticker').addEventListener('click', () => {
-    sendSticker(sticker.id);
-  });
-  
   userStickerGrid.appendChild(stickerElement);
 }
 
@@ -276,44 +268,6 @@ async function buyIndividualSticker(stickerId) {
   }
 }
 
-async function buyStickerPack() {
-  const auth = loadAuth();
-  if (!auth) {
-    alert('Please login to buy sticker packs');
-    return;
-  }
-  
-  if (!confirm(`Buy the complete sticker pack for ${STICKER_PACK_PRICE.toLocaleString()} coins?`)) {
-    return;
-  }
-  
-  try {
-    const response = await postForm({
-      mode: 'buyStickerPack',
-      username: auth.u,
-      password: auth.p
-    });
-    
-    if (response.status === 'ok') {
-      // Update userStickers with all sticker IDs
-      userStickers = Array.from({length: STICKER_COUNT}, (_, i) => i + 1);
-      
-      // Mark all stickers as purchased
-      allStickers.forEach(sticker => {
-        sticker.purchased = true;
-      });
-      
-      alert('Sticker pack purchased! You now have access to all stickers!');
-      renderStickers();
-      refreshUserBalance(auth.u);
-    } else {
-      alert(response.message || 'Failed to purchase sticker pack');
-    }
-  } catch (error) {
-    alert('Failed to purchase sticker pack: ' + error.message);
-  }
-}
-
 async function sendSticker(stickerId) {
   const auth = loadAuth();
   if (!auth) {
@@ -330,7 +284,7 @@ async function sendSticker(stickerId) {
   // Create the sticker message text
   const stickerMessage = `STICKER::${sticker.url}`;
   
-  // Use the sendMessage function to send the sticker
+  // Use the sendMessage function (handles replyTarget internally)
   const success = sendMessage(stickerMessage);
   
   if (success) {
@@ -339,22 +293,53 @@ async function sendSticker(stickerId) {
   }
 }
 
-export async function openStickerShop() {
+function sendPrivateSticker(stickerId) {
+  const auth = loadAuth();
+  if (!auth) {
+    alert('Please login to send stickers');
+    return;
+  }
+
+  const sticker = allStickers.find(s => s.id === stickerId);
+  if (!sticker) {
+    alert('Sticker not found');
+    return;
+  }
+
+  // ✅ Optimistically insert into private chat
+  insertPrivateSticker(sticker.url);
+
+  // ✅ Close the sticker modal immediately
+  closeStickerModal();
+}
+
+export async function openStickerShop(isPrivate = false) {
   try {
-    // Ensure stickers are loaded before showing the modal
-    if (!isStickersLoaded) {
-      await initStickers();
-    }
-    
-    if (!stickerModal) {
-      createStickerUI();
-    }
-    
+    if (!isStickersLoaded) await initStickers();
+    if (!stickerModal) createStickerUI();
+
+    // Remove old listeners
+    stickerModal.querySelectorAll('.send-sticker').forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.replaceWith(newBtn);
+    });
+
+    // Attach correct handler
+    stickerModal.querySelectorAll('.send-sticker').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stickerId = parseInt(btn.dataset.stickerId, 10);
+        if (isPrivate) {
+          sendPrivateSticker(stickerId);
+        } else {
+          sendSticker(stickerId);
+        }
+      });
+    });
+
     stickerModal.hidden = false;
     document.body.style.overflow = 'hidden';
-    
-  } catch (error) {
-    console.error('Failed to open sticker shop:', error);
+  } catch (err) {
+    console.error('Failed to open sticker shop:', err);
     alert('Failed to load stickers. Please try again.');
   }
 }

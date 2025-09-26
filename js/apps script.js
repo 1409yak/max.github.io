@@ -15,7 +15,8 @@ function doGet(e) {
   const mode = (e.parameter.mode || '').toLowerCase();
 
   if (mode === 'messages') {
-    const messages = listMessages_(MAX_MESSAGES_RETURN);
+    const user = e.parameter.user || null;
+    const messages = listMessages_(MAX_MESSAGES_RETURN, user);
     return jsonResponse_({ status: 'ok', messages });
   }
 
@@ -95,6 +96,32 @@ function doPost(e) {
         return jsonResponse_({ status: 'ok', profile });
       }
 
+      case 'setProfilePicture': {
+        const u = params.username;
+        const p = params.password;
+        const pictureName = params.picture_name;
+        
+        if (!verify_(u, p)) throw new Error('Invalid credentials');
+        if (!pictureName) throw new Error('Picture name required');
+        
+        // Validate picture name format (e.g., "001.png", "045.png")
+        if (!pictureName.match(/^\d{3}\.png$/)) {
+          throw new Error('Invalid picture name format');
+        }
+        
+        setProfilePicture_(u, pictureName);
+        return jsonResponse_({ status: 'ok', message: 'Profile picture updated' });
+      }
+
+      case 'getProfilePicture': {
+        const u = params.username;
+        const profile = getProfile_(u);
+        return jsonResponse_({ 
+          status: 'ok', 
+          profile_picture: profile.profile_picture || '001.png' // Default to first picture
+        });
+      }
+
       case 'getBio': {
         const u = params.username;
         const p = params.password;
@@ -170,72 +197,6 @@ function doPost(e) {
         });
       }
 
-      /* ===== CRYPTO ===== */
-      case 'buyCrypto': {
-        const u = params.username;
-        const p = params.password;
-        const symbol = params.symbol;  // e.g. BTC
-        const amount = Number(params.amount);
-
-        if (!verify_(u, p)) throw new Error('Invalid credentials');
-        if (!symbol || isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
-
-        // get user balance
-        const bal = getBalance_(u);
-
-        // fetch price from CoinGecko (or use random sim prices)
-        const price = getSimulatedPrice_(symbol);
-        const cost = price * amount;
-
-        if (bal < cost) throw new Error('Not enough coins');
-
-        // Deduct balance
-        setBalance_(u, bal - cost);
-
-        // Add to holdings
-        addHolding_(u, symbol, amount, cost);
-
-        return jsonResponse_({ status: 'ok', newBalance: bal - cost });
-      }
-
-      case 'sellCrypto': {
-        const u = params.username;
-        const p = params.password;
-        const symbol = params.symbol;
-        const amount = Number(params.amount);
-
-        if (!verify_(u, p)) throw new Error('Invalid credentials');
-        if (!symbol || isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
-
-        const price = getSimulatedPrice_(symbol);
-        const proceeds = price * amount;
-
-        // Remove from holdings
-        if (!removeHolding_(u, symbol, amount)) throw new Error('Not enough holdings');
-
-        // Add balance
-        const newBal = addBalance_(u, proceeds);
-
-        return jsonResponse_({ status: 'ok', newBalance: newBal, proceeds });
-      }
-
-      case 'getWallet': {
-        const u = params.username;
-        const p = params.password;
-        if (!verify_(u, p)) throw new Error('Invalid credentials');
-
-        const wallet = getHoldings_(u);
-        // attach live prices
-        const withPrices = wallet.map(h => {
-          const price = getSimulatedPrice_(h.symbol);
-          const avg = h.total_cost / h.amount;
-          const pnl = ((price - avg) / avg) * 100;
-          return { ...h, price, avg, pnl };
-        });
-
-        return jsonResponse_({ status: 'ok', wallet: withPrices });
-      }
-
       /* ===== STICKERS ===== */
       case 'getUserStickers': {
         const u = params.username;
@@ -292,11 +253,15 @@ function doPost(e) {
         if (!verify_(u, p)) throw new Error('Invalid credentials');
         if (!text || text.length > 500) throw new Error('Message must be 1-500 characters');
         
+        // Check if user is muted
+        if (isUserMuted_(u)) {
+          return jsonResponse_({ status: 'error', message: 'You are muted and cannot send messages' });
+        }
+        
         const id = appendMessage_(u, text, replyTo);
         return jsonResponse_({ status: 'ok', id });
       }
 
-      // In your doPost function in Google Apps Script
       case 'uploadImage': {
         const u = params.username;
         const p = params.password;
@@ -308,6 +273,11 @@ function doPost(e) {
         if (!verify_(u, p)) throw new Error('Invalid credentials');
         if (!fileData) throw new Error('No file data');
         
+        // Check if user is muted
+        if (isUserMuted_(u)) {
+          return jsonResponse_({ status: 'error', message: 'You are muted and cannot send messages' });
+        }
+        
         try {
           const imageUrl = handleImageUpload_({
             file: fileData,
@@ -315,7 +285,6 @@ function doPost(e) {
             type: fileType
           });
           
-          // Send the image as a message
           const id = appendMessage_(u, `IMAGE::${imageUrl}`, replyTo);
           
           return jsonResponse_({ 
@@ -329,7 +298,53 @@ function doPost(e) {
             message: error.message 
           });
         }
-}
+      }
+
+      case 'sendPrivate': {
+        const u = params.username;
+        const p = params.password;
+        const text = params.text;
+        const replyTo = params.reply_to;
+        const sendTo = params.send_to;
+        
+        if (!verify_(u, p)) throw new Error('Invalid credentials');
+        if (!text || text.length > 500) throw new Error('Message must be 1-500 characters');
+        if (!sendTo) throw new Error('Recipient required for private messages');
+        
+        // Check if user is muted
+        if (isUserMuted_(u)) {
+          return jsonResponse_({ status: 'error', message: 'You are muted and cannot send messages' });
+        }
+        
+        const id = appendPrivateMessage_(u, text, replyTo, sendTo);
+        return jsonResponse_({ status: 'ok', id });
+      }
+
+      case 'uploadPrivateImage': {
+        const u = params.username;
+        const p = params.password;
+        const fileData = params.file;
+        const fileName = params.name;
+        const fileType = params.type;
+        const replyTo = params.reply_to;
+        const sendTo = params.send_to;
+
+        if (!verify_(u, p)) throw new Error('Invalid credentials');
+        if (!fileData) throw new Error('No file data');
+        if (!sendTo) throw new Error('Recipient required');
+
+        if (isUserMuted_(u)) {
+          return jsonResponse_({ status: 'error', message: 'You are muted and cannot send messages' });
+        }
+
+        const imageUrl = handleImageUpload_({ file: fileData, name: fileName, type: fileType });
+
+        const id = appendPrivateMessage_(u, `IMAGE::${imageUrl}`, replyTo, sendTo);
+
+        return jsonResponse_({ status: 'ok', id, imageUrl });
+      }
+
+
 
       case 'delete': {
         const u = params.username;
@@ -368,12 +383,12 @@ function getSheet_(name) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
     if (name === USERS_SHEET) {
-      // Add stickers_owned as column 7
       sheet.getRange(1, 1, 1, 7)
         .setValues([['username', 'pass_hash', 'created_at', 'bio', 'last_active', 'balance', 'stickers_owned']]);
     } else if (name === MSGS_SHEET) {
-      sheet.getRange(1, 1, 1, 5)
-        .setValues([['id', 'timestamp', 'username', 'text', 'reply_to']]);
+      // UPDATE THIS LINE - ADD send_to AS COLUMN 6
+      sheet.getRange(1, 1, 1, 6)
+        .setValues([['id', 'timestamp', 'username', 'text', 'reply_to', 'send_to']]);
     }
     sheet.setFrozenRows(1);
   }
@@ -403,6 +418,16 @@ function findUserRow_(username) {
     if (String(usernames[i][0]) === username) return i + 2;
   }
   return null;
+}
+
+function isUserMuted_(username) {
+  const row = findUserRow_(username);
+  if (!row) return false;
+  
+  const sheet = getSheet_(USERS_SHEET);
+  // Changed from column 8 to column 9 for mute
+  const muteValue = String(sheet.getRange(row, 9).getValue() || '').toLowerCase();
+  return muteValue === 'true';
 }
 
 function updateLastActive_(username) {
@@ -513,7 +538,8 @@ function getProfile_(username) {
   if (!row) throw new Error('User not found');
 
   const sheet = getSheet_(USERS_SHEET);
-  const data = sheet.getRange(row, 1, 1, 7).getValues()[0]; // Include stickers_owned column
+  const lastColumn = sheet.getLastColumn();
+  const data = sheet.getRange(row, 1, 1, Math.max(8, lastColumn)).getValues()[0];
 
   return {
     username: data[0],
@@ -521,9 +547,26 @@ function getProfile_(username) {
     bio: data[3] || '',
     last_active: data[4] || '',
     balance: Number(data[5] || 0),
-    stickers_owned: data[6] || ''
+    stickers_owned: data[6] || '',
+    profile_picture: data[7] || '001.png' // Default to first picture
   };
 }
+
+function setProfilePicture_(username, pictureName) {
+  const row = findUserRow_(username);
+  if (!row) throw new Error('User not found');
+  
+  const sheet = getSheet_(USERS_SHEET);
+  
+  // Check if column 8 exists, if not create it
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn < 8) {
+    sheet.getRange(1, 8).setValue('profile_picture');
+  }
+  
+  sheet.getRange(row, 8).setValue(pictureName);
+}
+
 
 function getBalance_(username) {
   const row = findUserRow_(username);
@@ -594,7 +637,20 @@ function appendMessage_(username, text, replyTo) {
   return id;
 }
 
-function listMessages_(limit) {
+function appendPrivateMessage_(username, text, replyTo, sendTo) {
+  const id = generateMessageId_();
+  const iso = new Date().toISOString();
+  getSheet_(MSGS_SHEET)
+    .appendRow([id, iso, username, text, replyTo || '', sendTo]);
+  updateLastActive_(username);
+
+  // Award 1 coin for sending a message
+  addBalance_(username, 5);
+
+  return id;
+}
+
+function listMessages_(limit, requestingUser = null) {
   const sheet = getSheet_(MSGS_SHEET);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
@@ -602,8 +658,12 @@ function listMessages_(limit) {
   const count = Math.min(limit || MAX_MESSAGES_RETURN, lastRow - 1);
   const startRow = Math.max(2, lastRow - count + 1);
 
-  // Get all 5 columns: id, timestamp, username, text, reply_to
-  const rows = sheet.getRange(startRow, 1, count, 5).getValues();
+  // First, check how many columns we actually have
+  const lastColumn = sheet.getLastColumn();
+  const numColumns = Math.min(6, lastColumn); // Don't try to get more columns than exist
+  
+  // Get the available columns
+  const rows = sheet.getRange(startRow, 1, count, numColumns).getValues();
 
   // Convert to objects
   const msgs = rows.map(r => {
@@ -613,6 +673,7 @@ function listMessages_(limit) {
     const tsVal = r[1];
     const tsMs = tsVal instanceof Date ? tsVal.getTime() : Date.parse(tsVal);
     const replyTo = String(r[4] || '').trim();
+    const sendTo = numColumns >= 6 ? String(r[5] || '').trim() : ''; // Safe access to column 6
     
     return {
       id: String(r[0]),
@@ -620,19 +681,33 @@ function listMessages_(limit) {
       username: String(r[2]),
       text: String(r[3]),
       reply_to: replyTo,
+      send_to: sendTo,
       reply_preview: null
     };
   }).filter(msg => msg !== null);
 
+  // Filter messages based on requesting user
+  const filteredMsgs = msgs.filter(msg => {
+    // Show public messages (no send_to)
+    if (!msg.send_to) return true;
+    
+    // Show private messages where user is either sender or recipient
+    if (requestingUser && (msg.username === requestingUser || msg.send_to === requestingUser)) {
+      return true;
+    }
+    
+    return false;
+  });
+
   // Add reply previews
-  for (let i = 0; i < msgs.length; i++) {
-    const m = msgs[i];
+  for (let i = 0; i < filteredMsgs.length; i++) {
+    const m = filteredMsgs[i];
     const parentId = m.reply_to;
     
     if (!parentId) continue;
 
     // Try to find parent in current batch
-    let parent = msgs.find(msg => msg.id === parentId);
+    let parent = filteredMsgs.find(msg => msg.id === parentId);
     
     // If not found, search the entire sheet
     if (!parent) {
@@ -648,7 +723,7 @@ function listMessages_(limit) {
     }
   }
 
-  return msgs;
+  return filteredMsgs;
 }
 
 function findMessageById_(id) {

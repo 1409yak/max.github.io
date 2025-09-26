@@ -6,6 +6,8 @@
   <title>MAX Messenger</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="..." crossorigin="anonymous">
+
 </head>
 <body>
   <main class="glass-container">
@@ -15,10 +17,9 @@
         MAX Messenger
       </h1>
       <div class="header-actions">
-        <span id="whoami" class="user-badge"></span>
+        <span id="whoami" class="user-badge" hidden></span>
+        <button id="toggleUsersBtn" class="icon-btn"><i class="fas fa-users"></i></button>
         <button id="profileBtn" class="glass-btn" hidden>Profile</button>
-        <!-- <button id="walletBtn" class="glass-btn">💼 Wallet</button> -->  
-        <button id="toggleUsersBtn" class="glass-btn">👥</button>
       </div>
     </header>
 
@@ -62,8 +63,8 @@
         <div id="replyPreview" style="display:none;"></div>
         <div class="attachment-options">
           <input type="file" id="imageUpload" accept="image/*" hidden>
-          <button type="button" id="attachImageBtn" class="glass-btn">📷</button>
-          <button type="button" id="stickerBtn" class="glass-btn">🎨</button>
+          <button id="attachImageBtn" class="icon-btn"><i class="fas fa-image"></i></button>
+          <button id="stickerBtn" class="icon-btn"><i class="fas fa-face-smile"></i></button>
         </div>
         <button id="sendBtn" type="submit" class="glass-btn primary">
           <svg width="20" height="20" viewBox="0 0 24 24">
@@ -73,59 +74,121 @@
       </form>
     </section>
 
-    <!-- Wallet Modal -->
-    <section id="walletModal" class="glass-modal" hidden>
-      <h2>My Wallet</h2>
-      <div id="walletContent"></div>
-      <div class="modal-actions">
-        <button id="closeWallet" class="glass-btn">Close</button>
+    <!-- Private Messages -->
+    <section id="privateChatUI" class="glass-chat" hidden>
+      <div class="private-chat-header">
+        <button id="backToMainChat" class="icon-btn"><i class="fas fa-arrow-left"></i></button>
+        <h3 id="privateChatWith">Chat with <span id="privateChatUsername"></span></h3>
       </div>
+      
+      <div id="privateMessages" class="glass-messages" aria-live="polite"></div>
+
+      <button id="privateScrollBottomBtn" class="glass-scroll-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+        </svg>
+      </button>
+
+      <form id="privateSendForm" class="glass-sendbar">
+        <textarea id="privateMessageInput" rows="2" maxlength="500" placeholder="Type a private message…" class="glass-input"></textarea>
+        <div id="privateReplyPreview" style="display:none;"></div>
+        <div class="attachment-options">
+          <input type="file" id="privateImageUpload" accept="image/*" hidden>
+          <button id="privateAttachImageBtn" type="button" class="icon-btn"><i class="fas fa-image"></i></button>
+          <button id="privateStickerBtn" type="button" class="icon-btn"><i class="fas fa-face-smile"></i></button>
+        </div>
+        
+        <button id="privateSendBtn" type="submit" class="glass-btn primary">
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </form>
     </section>
 
 
     <!-- Profile Modal -->
-    <section id="profileModal" class="glass-modal" hidden>
-      <h2>My Profile</h2>
-      <p><strong>Username:</strong> <span id="profileUsername"></span></p>
+  <section id="profileModal" class="glass-modal" hidden>
+    <h2>My Profile</h2>
+    
+    <!-- Profile Picture Section -->
+    <div class="profile-picture-section">
+      <div class="profile-picture-container">
+        <img id="profilePicture" src="../profiles/001.png" alt="Your profile picture" class="user-profile-picture">
+        <button id="changeProfilePicture" class="change-picture-btn">Change Picture</button>
+      </div>
+    </div>
 
-      <p><strong>Balance:</strong> <span id="profileBalance"></span> 💰</p>
+    <p>
+      <strong>Username:</strong> 
+      <span id="profileUsername"></span>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </p>
 
-      <p><strong>Bio:</strong></p>
+    <p><strong>Balance:</strong> <span id="profileBalance"></span> 💰</p>
+
+    <p><strong>Bio:</strong></p>
+    <div class="bio-container">
       <textarea id="profileBio" rows="4" maxlength="200" placeholder="Write something about yourself..." class="glass-input"></textarea>
+      <button id="saveBio" class="save-bio-btn">Save</button>
+    </div>
 
-      <p><strong>Theme Colors:</strong></p>
-      <div class="color-pickers">
-        <div class="color-item">
-          <label for="themeColor1">First Color</label>
-          <input type="color" id="themeColor1" value="#667eea">
-        </div>
+    <p><strong>Theme Colors:</strong></p>
+    <div class="color-pickers">
+      <div class="color-item">
+        <label for="themeColor1">First Color</label>
+        <input type="color" id="themeColor1" value="#667eea">
+      </div>
 
-        <div class="color-item">
-          <label for="themeColor2">Second Color</label>
-          <input type="color" id="themeColor2" value="#764ba2">
-        </div>
+      <div class="color-item">
+        <label for="themeColor2">Second Color</label>
+        <input type="color" id="themeColor2" value="#764ba2">
+      </div>
       <div class="reset-theme" id="resetTheme">Reset to Default</div>
-      </div>
-      <div class="modal-actions">
-        <button id="saveBio" class="glass-btn primary">Save</button>
-        <button id="logoutBtn" class="glass-btn danger">Logout</button>
-        <button id="closeProfile" class="glass-btn">Close</button>
-      </div>
-    </section>
+    </div>
+    
+    <p><strong>Font Family:</strong></p>
+    <div class="font-selector">
+      <select id="fontFamily" class="glass-input">
+        <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Default Font</option>
+        <option value="'Arial', sans-serif">Arial</option>
+        <option value="'Georgia', serif">Georgia</option>
+        <option value="'Courier New', monospace">Courier New</option>
+        <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+        <option value="'Verdana', sans-serif">Verdana</option>
+        <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+        <option value="'Impact', sans-serif">Impact</option>
+      </select>
+    </div>
+    <div class="reset-font" id="resetFont">Reset to Default Font</div>
+    
+    <div class="modal-actions">
+      <button id="closeProfile" class="glass-btn">Close</button>
+    </div>
+  </section>
 
 
-    <!-- View Profile Modal -->
-    <section id="viewProfileModal" class="glass-modal" hidden>
-      <h2>User Profile</h2>
-      <p><strong>Username:</strong> <span id="viewProfileUsername"></span></p>
-      <p><strong>Created:</strong> <span id="viewProfileCreated"></span></p>
-      <p><strong>Balance:</strong> <span id="viewProfileBalance"></span> 💰</p>
-      <p><strong>Bio:</strong></p>
-      <div class="glass-bio"><p id="viewProfileBio"></p></div>
-      <div class="modal-actions">
-        <button id="closeViewProfile" class="glass-btn">Close</button>
+  <!-- View Profile Modal -->
+  <section id="viewProfileModal" class="glass-modal" hidden>
+    <h2>User Profile</h2>
+    
+    <!-- Profile Picture Section -->
+    <div class="profile-picture-section">
+      <div class="profile-picture-container">
+        <img id="viewProfilePicture" src="../profiles/001.png" alt="Profile picture" class="user-profile-picture">
       </div>
-    </section>
+    </div>
+
+    <p><strong>Username:</strong> <span id="viewProfileUsername"></span></p>
+    <p><strong>Created:</strong> <span id="viewProfileCreated"></span></p>
+    <p><strong>Balance:</strong> <span id="viewProfileBalance"></span> 💰</p>
+    <p><strong>Bio:</strong></p>
+    <div class="glass-bio"><p id="viewProfileBio"></p></div>
+    
+    <div class="modal-actions">
+      <button id="closeViewProfile" class="glass-btn">Close</button>
+    </div>
+  </section>
 
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="glass-loading" hidden>

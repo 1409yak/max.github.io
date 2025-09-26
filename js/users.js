@@ -17,6 +17,18 @@ async function fetchUsers() {
     if (resp.status === 'ok' && Array.isArray(resp.profiles)) {
       // Sort by coins (highest first) by default
       renderUsers(resp.profiles, 'coins');
+      
+      // Update state and trigger profile preloading
+      window.appLoadingState.usersLoaded = true;
+      if (window.appLoadingState.messagesLoaded && !window.appLoadingState.profilesPreloaded) {
+        setTimeout(() => {
+          import('./main.js').then(module => {
+            if (module.triggerProfilePreload) {
+              module.triggerProfilePreload();
+            }
+          });
+        }, 1000);
+      }
     }
   } catch (err) {
     console.error('Failed to fetch users:', err);
@@ -161,7 +173,7 @@ export function stopHeartbeat() {
   // Additional click outside to close on mobile
   document.addEventListener('click', (e) => {
     if (window.innerWidth <= 768 && 
-        !aside.contains(e.target) && 
+        !toggleBtn.contains(e.target) && 
         e.target !== toggleBtn && 
         aside.classList.contains('open')) {
       aside.classList.remove('open');

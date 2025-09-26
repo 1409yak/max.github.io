@@ -44,6 +44,15 @@ export function stopPolling() {
 /* ========================================================================== */
 /* Networking                                                                 */
 /* ========================================================================== */
+function linkifyText(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.replace(urlRegex, url => {
+    // escape HTML inside URL if needed
+    const safeUrl = url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`;
+  });
+}
+
 export async function refreshMessages(firstLoad = false) {
   try {
     const data = await getMessages();
@@ -98,16 +107,14 @@ export function sendMessage(text) {
     } : null
   };
 
-  // In sendMessage function, where PENDING_MESSAGES.set is called:
   PENDING_MESSAGES.set(tempId, {
     text,
     username: auth.u,
     ts: now,
     reply_to: fakeMessage.reply_to,
     reply_preview: fakeMessage.reply_preview,
-    // Add type flags for better matching
     isSticker: text.startsWith("STICKER::"),
-    isImage: false // images are handled separately in sendImage
+    isImage: false
   });
 
   const msgEl = createMessageElement(fakeMessage, "sent");
@@ -141,10 +148,20 @@ export function sendMessage(text) {
         if (pendingEl) {
           pendingEl.classList.add("failed");
         }
-        alert(resp.message || 'Failed to send message');
+        
+        // SPECIAL HANDLING FOR MUTE ERROR
+        if (resp.message && resp.message.toLowerCase().includes('muted')) {
+          alert('You are muted and cannot send messages');
+          // Remove the failed message from UI if user is muted
+          if (pendingEl) {
+            pendingEl.remove();
+          }
+          PENDING_MESSAGES.delete(tempId);
+        } else {
+          alert(resp.message || 'Failed to send message');
+        }
       }
     })
-
     .catch(err => {
       console.error('Send message error:', err);
       const pendingEl = messagesDiv.querySelector(`.msg[data-msg-id="${tempId}"]`);
@@ -216,22 +233,46 @@ export function sendImage(fileData, fileName, fileType) {
           pendingEl.dataset.msgId = resp.id;
           updateMessageStatus(pendingEl, "delivered");
           
-          // Update the image source once we have the real URL
-          if (resp.imageUrl) {
-            const imgEl = pendingEl.querySelector('.msg-image');
-            if (imgEl) {
-              let imgUrl = resp.imageUrl;
-              const match = imgUrl.match(/\/d\/([a-zA-Z0-9_-]+)(\/|$)/);
-              if (match) imgUrl = `https://drive.google.com/thumbnail?id=${match[1]}`;
-              imgEl.src = imgUrl;
-              imgEl.alt = fileName;
-            }
+          // Remove the uploading text and create the actual image element
+          const uploadingEl = pendingEl.querySelector('.msg-uploading');
+          if (uploadingEl) {
+            uploadingEl.remove();
           }
+          
+          // Create and add the actual image
+          if (resp.imageUrl) {
+            let imgUrl = resp.imageUrl;
+            const match = imgUrl.match(/\/d\/([a-zA-Z0-9_-]+)(\/|$)/);
+            if (match) imgUrl = `https://drive.google.com/thumbnail?id=${match[1]}`;
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = imgUrl;
+            imgEl.className = 'msg-image';
+            imgEl.alt = fileName;
+            imgEl.addEventListener('click', () => window.open(imgUrl, '_blank'));
+            imgEl.addEventListener('load', () => {
+              if (isScrolledToBottom) scrollMessagesToBottom(true);
+            });
+            
+            pendingEl.appendChild(imgEl);
+          }
+          
+          // Update the dataset to reflect the actual image URL
+          pendingEl.dataset.originalText = "IMAGE::" + resp.imageUrl;
         }
         PENDING_MESSAGES.delete(tempId);
       } else {
         msgEl.classList.add("failed");
-        alert(resp.message || 'Failed to upload image');
+        
+        // SPECIAL HANDLING FOR MUTE ERROR
+        if (resp.message && resp.message.toLowerCase().includes('muted')) {
+          alert('You are muted and cannot send messages');
+          // Remove the failed message from UI if user is muted
+          msgEl.remove();
+          PENDING_MESSAGES.delete(tempId);
+        } else {
+          alert(resp.message || 'Failed to upload image');
+        }
       }
     })
     .catch(err => {
@@ -434,14 +475,13 @@ function updateExistingMessage(element, message) {
   if (!isSticker) {
     element.ondblclick = () => {
       let replyText = message.text;
-      
-      // Handle different message types for reply preview
-      if (message.text && message.text.startsWith("IMAGE::")) {
+
+      if (message.text?.startsWith("IMAGE::")) {
         replyText = "[image]";
-      } else if (message.text && message.text.startsWith("STICKER::")) {
+      } else if (message.text?.startsWith("STICKER::")) {
         replyText = "[sticker]";
       }
-      
+
       setReplyTarget({
         id: message.id,
         username: message.username,
@@ -571,7 +611,7 @@ function createMessageElement(message, status = null) {
     // TEXT MESSAGE - Regular message box
     const textEl = document.createElement('div');
     textEl.className = 'msg-text';
-    textEl.textContent = message.text;
+    textEl.innerHTML = linkifyText(message.text);
     msgEl.appendChild(textEl);
   }
 
@@ -601,11 +641,12 @@ function createMessageElement(message, status = null) {
   if (!isSticker) {
     msgEl.addEventListener('dblclick', () => {
       let replyText = message.text;
-      
       if (isImage) {
         replyText = "[image]";
+      } else if (isSticker) {
+        replyText = "[sticker]";
       }
-      
+
       setReplyTarget({
         id: message.id,
         username: message.username,
@@ -622,12 +663,26 @@ function createMessageElement(message, status = null) {
 /* ========================================================================== */
 function setReplyTarget(msg) {
   replyTarget = msg;
+
   if (replyPreviewDiv) {
+    let previewContent = msg.text;
+
+    // Handle special message types
+    if (msg.text?.startsWith("IMAGE::")) {
+      previewContent = "[image]";
+    } else if (msg.text?.startsWith("STICKER::")) {
+      // Extract the actual sticker URL (after "STICKER::")
+      const stickerUrl = msg.text.replace("STICKER::", "");
+      previewContent = `<img src="${stickerUrl}" class="reply-sticker-thumb" style="height:40px;vertical-align:middle;">`;
+    }
+
     replyPreviewDiv.innerHTML = `
-      Replying to <b>${msg.username}</b>: ${msg.text}
+      Replying to <b>${msg.username}</b>: ${previewContent}
       <button id="cancelReplyBtn">✕</button>
     `;
     replyPreviewDiv.style.display = 'block';
+
+    // Restart small CSS animation
     replyPreviewDiv.classList.remove("animate");
     void replyPreviewDiv.offsetWidth;
     replyPreviewDiv.classList.add("animate");
@@ -811,6 +866,7 @@ export async function deleteMessage(messageId) {
 /* ========================================================================== */
 /* Listeners                                                                  */
 /* ========================================================================== */
+
 if (messagesDiv) {
   messagesDiv.addEventListener('scroll', checkScrollPosition);
 }

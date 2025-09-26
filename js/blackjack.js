@@ -1,4 +1,3 @@
-// blackjack.js
 import { loadAuth } from './auth.js';
 import { getCachedBalance, deductBalance, addToBalance } from './economyCache.js';
 
@@ -13,7 +12,7 @@ export function initBlackjack() {
   blackjackModal.hidden = true;
 
   blackjackModal.innerHTML = `
-    <h2>Blackjack 🎲</h2>
+    <h2>Blackjack</h2>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
       <label style="margin:0;">
         Bet: <input type="number" id="bjBet" min="1" value="100" style="width:110px;padding:6px;" />
@@ -54,7 +53,6 @@ export function initBlackjack() {
   actionBtns.hit.onclick = () => playerAction('hit');
   actionBtns.stand.onclick = () => playerAction('stand');
   blackjackModal.querySelector('#bjClose').onclick = () => {
-    // closing while a round is active will forfeit the bet (per your rules)
     resetRound();
     blackjackModal.hidden = true;
   };
@@ -65,7 +63,7 @@ export function initBlackjack() {
     const bjBtn = document.createElement('button');
     bjBtn.id = 'headerBJBtn';
     bjBtn.className = 'glass-btn';
-    bjBtn.textContent = '🎲';
+    bjBtn.innerHTML = '<i class="fas fa-dice"></i> Gambling'; // 🎲 icon
     bjBtn.onclick = () => {
       blackjackModal.hidden = false;
       updateBalanceUI();
@@ -109,14 +107,27 @@ function handValue(hand) {
   return total;
 }
 
+function getSuitIcon(suit) {
+  switch (suit) {
+    case '♠': return '<span style="color:black;">♠</span>';
+    case '♣': return '<span style="color:black;">♣</span>';
+    case '♥': return '<span style="color:red;">♥</span>';
+    case '♦': return '<span style="color:red;">♦</span>';
+    default: return suit;
+  }
+}
+
 function renderHands(showDealer=false) {
   const dealerEl = blackjackModal.querySelector('#dealerHand');
   const playerEl = blackjackModal.querySelector('#playerHand');
-  dealerEl.textContent = dealerHand.map((c,i)=>
-    (i===0||showDealer)? `${c.rank}${c.suit}` : '??'
+
+  dealerEl.innerHTML = dealerHand.map((c,i)=>
+    (i===0||showDealer) ? `${c.rank}${getSuitIcon(c.suit)}` : '??'
   ).join(' ');
-  playerEl.textContent = playerHand.map(c=>`${c.rank}${c.suit}`).join(' ')
-    + ` (${handValue(playerHand)})`;
+
+  playerEl.innerHTML = playerHand.map(c=>
+    `${c.rank}${getSuitIcon(c.suit)}`
+  ).join(' ') + ` (${handValue(playerHand)})`;
 }
 
 function updateBalanceUI() {
@@ -202,18 +213,12 @@ async function endGame(showDealer=false) {
 
   // Settlement using cache (fast). Server sync happens in economyCache's addToBalance.
   if (pv <= 21 && (dv > 21 || pv > dv)) {
-    // player wins: give 2x (per your rules)
     await addToBalance(betAmount * 2);
     statusEl.textContent += ` — You won ${betAmount * 2} coins!`;
   } else if (pv === dv) {
-    // push: return bet
     await addToBalance(betAmount);
     statusEl.textContent += ` — Bet returned.`;
-  } else {
-    // lost: nothing to do (bet already deducted)
   }
 
   updateBalanceUI();
-
-  // keep hands visible; start new round only when user clicks Start again
 }
